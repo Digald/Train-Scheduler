@@ -13,7 +13,7 @@ $(document).ready(function() {
 
     var trainName = "";
     var destination = "";
-    var trainTime = 0;
+    var trainTime = "";
     var trainFrequency = 0;
     // push values from form to firebase
     $("#submit-btn").on("click", function(event) {
@@ -22,7 +22,7 @@ $(document).ready(function() {
         // grab values from text boxes
         trainName = $("#train-input").val().trim();
         destination = $("#destination-input").val().trim();
-        trainTime = $("#firsttime-input").val().trim();
+        trainTime = moment($("#firsttime-input").val().trim(), "HH:mm").format();
         trainFrequency = $("#frequency-input").val().trim();
 
         // clear text fields for new input
@@ -36,26 +36,51 @@ $(document).ready(function() {
             TrainName: trainName,
             Destination: destination,
             TrainTime: trainTime,
-            Frequency: trainFrequency
+            Frequency: trainFrequency,
+            dateAdded: firebase.database.ServerValue.TIMESTAMP
         });
-
-        // call back values from firebase
-        database.ref().on("child_added", function(snapshot, prevVal) {
-        	// console.log(snapshot.val());
-
-        	// reuse variables to store values
-        	var trainName = snapshot.val().TrainName;
-        	var destination = snapshot.val().Destination;
-        	var trainTime = snapshot.val().TrainTime;
-        	var trainFrequency = snapshot.val().Frequency;
-        	// console.log(trainName, destination, trainTime, trainFrequency);
-
-        	// calculate time using moment.js
-
-        	// add variables to table
-        	$("#info-dump").append("<tr><td>" + trainName + "</td><td>" + destination + "</td><td>" + trainTime + "</td><td>" + trainFrequency + "</td></tr>");
-        });
-           
- 
     }); // end of submit form button
+
+    // call back values from firebase
+    database.ref().orderByChild("dateAdded").limitToLast(1).on("child_added", function(childSnapshot) {
+        console.log("From Firebase: " + childSnapshot);
+
+        // reuse variables to store values
+        var trainName = childSnapshot.val().TrainName;
+        var destination = childSnapshot.val().Destination;
+        var trainTime = childSnapshot.val().TrainTime;
+        var trainFrequency = childSnapshot.val().Frequency;
+
+        // calculate time using moment.js
+        var convertTime = moment(trainTime, "HH:mm").subtract(1, "years");
+        // console.log(convertTime);
+
+        // current time to compare minutes until next train
+        var currentTime = moment();
+        console.log("Current Time: " + moment(currentTime).format("HH:mm"));
+
+        // different in time between converted time and current
+        var diffTime = moment().diff(moment(convertTime), "minutes");
+
+        var remainder = diffTime % trainFrequency;
+
+        // minutes until next train comes
+        var minToNextTrain = trainFrequency - remainder;
+        console.log("Minutes until next train: " + minToNextTrain);
+
+        // arrival time in UNIX? convert to military time before displaying on html
+        var nextArrival = moment().add(minToNextTrain, "minutes");
+        console.log("Arrival Time: " + nextArrival);
+
+        
+
+
+        console.log("-----------------------------------------------------------------")
+        // add variables to table
+        $("#info-dump").append("<tr><td>" + trainName + "</td><td>" + destination + "</td><td>" +
+            trainFrequency + "</td><td>" + moment(nextArrival).format("HH:mm") + "</td><td>" +  minToNextTrain +"</td></tr>");
+    });
+
+
+
 }); // end page ready
